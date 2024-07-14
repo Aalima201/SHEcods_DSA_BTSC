@@ -1,0 +1,120 @@
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <queue>
+#include <limits>
+#include <string>
+
+using namespace std;
+
+class RouteBuddy {
+public:
+    void addEdge(const string& u, const string& v, double time) {
+        graph[u].push_back({v, time});
+    }
+
+    void updateTime(const string& u, const string& v, double new_time) {
+        for (auto& neighbor : graph[u]) {
+            if (neighbor.first == v) {
+                neighbor.second = new_time;
+                break;
+            }
+        }
+    }
+
+    double dijkstra(const string& start, const string& end, int k = -1) {
+        using Tuple = tuple<double, string, int>; // (distance, current_node, stops)
+        priority_queue<Tuple, vector<Tuple>, greater<Tuple>> pq;
+        unordered_map<string, double> distances;
+
+        for (const auto& pair : graph) {
+            distances[pair.first] = numeric_limits<double>::infinity();
+        }
+
+        pq.push({0, start, 0});
+        distances[start] = 0;
+
+        while (!pq.empty()) {
+            auto [current_distance, current_node, stops] = pq.top();
+            pq.pop();
+
+            if (current_node == end && (k == -1 || stops == k)) {
+                return current_distance;
+            }
+
+            if (k != -1 && stops > k) {
+                continue;
+            }
+
+            for (const auto& neighbor : graph[current_node]) {
+                const auto& [next_node, weight] = neighbor;
+                double distance = current_distance + weight;
+                if (distance < distances[next_node]) {
+                    distances[next_node] = distance;
+                    pq.push({distance, next_node, stops + 1});
+                }
+            }
+        }
+
+        return numeric_limits<double>::infinity();
+    }
+
+    unordered_map<int, double> findBestRoute(const string& start, const string& end, const vector<int>& ks) {
+        unordered_map<int, double> results;
+        for (int k : ks) {
+            results[k] = dijkstra(start, end, k);
+        }
+        return results;
+    }
+
+private:
+    unordered_map<string, vector<pair<string, double>>> graph;
+};
+
+// Helper function to print results
+void printBestRoutes(const unordered_map<int, double>& routes) {
+    for (const auto& [k, distance] : routes) {
+        cout << "Stops (k=" << k << "): " << distance << " hours" << endl;
+    }
+}
+
+int main() {
+    RouteBuddy routeBuddy;
+
+    vector<tuple<string, string, double>> edges = {
+        {"Mumbai", "Pune", 2}, {"Pune", "Jaipur", 5}, {"Jaipur", "Bhopal", 10},
+        {"Mumbai", "Panaji", 0.7}, {"Panaji", "Mangalore", 12}, {"Mangalore", "Calicut", 5.5},
+        {"Panaji", "Bangalore", 3.4}, {"Calicut", "Guntakal", 8}, {"Calicut", "Madurai", 0.6},
+        {"Bhopal", "Jabalpur", 12}, {"Bhopal", "Jamshedpur", 8}, {"Jamshedpur", "Hyderabad", 2.5},
+        {"Bangalore", "Hyderabad", 10.3}, {"Jabalpur", "Bhubaneshwar", 22.75},
+        {"Bhubaneshwar", "Vishakhapatnam", 3}, {"Vishakhapatnam", "Hyderabad", 4.8},
+        {"Pune", "Silvassa", 1.5}, {"Pune", "Ahmedabad", 11}, {"Ahmedabad", "Hyderabad", 14.55},
+        {"Panaji", "Puri", 19}, {"Puri", "Hyderabad", 1.8}, {"Mumbai", "Madgaon", 7},
+        {"Madgaon", "Chennai", 12}, {"Madgaon", "Agra", 25}, {"Agra", "Kanpur", 5.5},
+        {"Kanpur", "Lucknow", 9.25}, {"Lucknow", "Hyderabad", 6.5}, {"Agra", "Jaipur", 2.25},
+        {"Silvassa", "Hyderabad", 16.75}, {"Mumbai", "Varanasi", 5}
+    };
+
+    for (const auto& [u, v, time] : edges) {
+        routeBuddy.addEdge(u, v, time);
+    }
+
+    vector<tuple<string, string, double>> updates = {
+        {"Mumbai", "Pune", 1.5}, {"Pune", "Silvassa", 3}, {"Madgaon", "Chennai", 7},
+        {"Bhopal", "Jamshedpur", 12}, {"Panaji", "Puri", 15}, {"Vishakhapatnam", "Hyderabad", 7},
+        {"Mumbai", "Varanasi", 8.5}, {"Mangalore", "Calicut", 4.75}, {"Calicut", "Guntakal", 12.75},
+        {"Ahmedabad", "Hyderabad", 10.33}
+    };
+
+    for (const auto& [u, v, new_time] : updates) {
+        routeBuddy.updateTime(u, v, new_time);
+    }
+
+    vector<int> ks = {3, 5, 15, 7, 10};
+    auto bestRoutesBefore = routeBuddy.findBestRoute("Mumbai", "Hyderabad", ks);
+
+    cout << "Best routes before traffic updates:" << endl;
+    printBestRoutes(bestRoutesBefore);
+
+    return 0;
+}
