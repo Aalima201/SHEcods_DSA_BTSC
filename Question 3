@@ -1,0 +1,237 @@
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <ctime>
+#include <sstream>
+#include <map>
+#include <set>
+#include <algorithm>
+
+using namespace std;
+
+class FileSystemNode {
+public:
+    string name;
+    string content;
+    unordered_map<string, FileSystemNode*> children;
+
+    FileSystemNode(string name, string content = "") : name(name), content(content) {}
+};
+
+class Commit {
+public:
+    string message;
+    time_t timestamp;
+    FileSystemNode* snapshot;
+
+    Commit(string message, FileSystemNode* snapshot) : message(message), snapshot(snapshot) {
+        timestamp = time(0);
+    }
+};
+
+class Branch {
+public:
+    string name;
+    vector<Commit*> commits;
+
+    Branch(string name, FileSystemNode* root) : name(name) {
+        commits.push_back(new Commit("Initial commit", root));
+    }
+
+    FileSystemNode* getCurrentSnapshot() {
+        return commits.back()->snapshot;
+    }
+};
+
+class Repository {
+public:
+    string name;
+    FileSystemNode* root;
+    unordered_map<string, Branch*> branches;
+    string currentBranch;
+
+    Repository(string name) : name(name) {
+        root = new FileSystemNode("/");
+        branches["main"] = new Branch("main", new FileSystemNode(*root));
+        currentBranch = "main";
+    }
+
+    Branch* getCurrentBranch() {
+        return branches[currentBranch];
+    }
+};
+
+// Create Repository
+Repository* createRepository(string name) {
+    return new Repository(name);
+}
+
+// Helper function to copy the file tree structure
+FileSystemNode* copyFileSystemNode(FileSystemNode* node) {
+    FileSystemNode* newNode = new FileSystemNode(node->name, node->content);
+    for (const auto& child : node->children) {
+        newNode->children[child.first] = copyFileSystemNode(child.second);
+    }
+    return newNode;
+}
+
+// Commit Changes
+void commit(Repository* repo, string message, unordered_map<string, string> changes) {
+    FileSystemNode* newSnapshot = copyFileSystemNode(repo->getCurrentBranch()->getCurrentSnapshot());
+
+    for (const auto& change : changes) {
+        stringstream ss(change.first);
+        string part;
+        FileSystemNode* currentNode = newSnapshot;
+
+        while (getline(ss, part, '/')) {
+            if (ss.peek() == '/') {
+                if (currentNode->children.find(part) == currentNode->children.end()) {
+                    currentNode->children[part] = new FileSystemNode(part);
+                }
+                currentNode = currentNode->children[part];
+            } else {
+                currentNode->children[part] = new FileSystemNode(part, change.second);
+            }
+        }
+    }
+
+    repo->getCurrentBranch()->commits.push_back(new Commit(message, newSnapshot));
+}
+
+// Create Branch
+void createBranch(Repository* repo, string branch_name) {
+    repo->branches[branch_name] = new Branch(branch_name, copyFileSystemNode(repo->getCurrentBranch()->getCurrentSnapshot()));
+}
+
+// Switch Branch
+void switchBranch(Repository* repo, string branch_name) {
+    if (repo->branches.find(branch_name) != repo->branches.end()) {
+        repo->currentBranch = branch_name;
+    } else {
+        cout << "Branch not found." << endl;
+    }
+}
+
+// Merge Branch
+void mergeBranch(Repository* repo, string source_branch, string target_branch) {
+    if (repo->branches.find(source_branch) == repo->branches.end() || repo->branches.find(target_branch) == repo->branches.end()) {
+        cout << "One of the branches not found." << endl;
+        return;
+    }
+
+    FileSystemNode* sourceSnapshot = repo->branches[source_branch]->getCurrentSnapshot();
+    FileSystemNode* targetSnapshot = repo->branches[target_branch]->getCurrentSnapshot();
+
+    unordered_map<string, string> changes;
+    set<string> conflicts;
+
+    function<void(FileSystemNode*, FileSystemNode*, string)> traverse = [&](FileSystemNode* source, FileSystemNode* target, string path) {
+        if (source->content != target->content) {
+            if (target->content == "") {
+                changes[path] = source->content;
+            } else {
+                conflicts.insert(path);
+            }
+        }
+
+        for (const auto& child : source->children) {
+            traverse(child.second, target->children[child.first], path + "/" + child.first);
+        }
+    };
+
+    traverse(sourceSnapshot, targetSnapshot, "");
+
+    if (conflicts.empty()) {
+        for (const auto& change : changes) {
+            commit(repo, "Merge from " + source_branch + " to " + target_branch, {{change.first, change.second}});
+        }
+        cout << "Merged successfully without conflicts." << endl;
+    } else {
+        cout << "Merge conflicts found:" << endl;
+        for (const auto& conflict : conflicts) {
+            cout << conflict << endl;
+        }
+    }
+}
+
+// Resolve Conflicts
+void resolveConflict(Repository* repo, string conflict_id, string resolution) {
+    commit(repo, "Conflict resolution for " + conflict_id, {{conflict_id, resolution}});
+}
+
+// View Commit History
+void viewCommitHistory(Repository* repo, string branch_name) {
+    if (repo->branches.find(branch_name) == repo->branches.end()) {
+        cout << "Branch not found." << endl;
+        return;
+    }
+
+    for (const auto& commit : repo->branches[branch_name]->commits) {
+        cout << "Commit message: " << commit->message << endl;
+        cout << "Timestamp: " << ctime(&commit->timestamp);
+    }
+}
+
+// View File History
+void viewFileHistory(Repository* repo, string file_path) {
+    for (const auto& branch : repo->branches) {
+        cout << "Branch: " << branch.first << endl;
+        for (const auto& commit : branch.second->commits) {
+            stringstream ss(file_path);
+            string part;
+            FileSystemNode* currentNode = commit->snapshot;
+
+            while (getline(ss, part, '/')) {
+                if (currentNode->children.find(part) != currentNode->children.end()) {
+                    currentNode = currentNode->children[part];
+                } else {
+                    currentNode = nullptr;
+                    break;
+                }
+            }
+
+            if (currentNode != nullptr) {
+                cout << "Commit message: " << commit->message << endl;
+                cout << "Timestamp: " << ctime(&commit->timestamp);
+                cout << "Content: " << currentNode->content << endl;
+            }
+        }
+    }
+}
+
+// Driver Function
+int main() {
+    Repository* repo = createRepository("MyRepo");
+
+    // Initial Commit
+    commit(repo, "Initial Commit", {});
+
+    // Commit changes to various files and directories
+    commit(repo, "Add file1.txt", {{"dir/file1.txt", "Content of file1"}});
+    commit(repo, "Add file2.txt", {{"dir/file2.txt", "Content of file2"}});
+
+    // Create a new branch
+    createBranch(repo, "feature");
+
+    // Switch to the new branch
+    switchBranch(repo, "feature");
+
+    // Commit changes in the new branch
+    commit(repo, "Modify file1.txt in feature branch", {{"dir/file1.txt", "Modified content of file1 in feature branch"}});
+
+    // Switch back to the main branch
+    switchBranch(repo, "main");
+
+    // Merge branches
+    mergeBranch(repo, "feature", "main");
+
+    // View commit history
+    viewCommitHistory(repo, "main");
+
+    // View file history
+    viewFileHistory(repo, "dir/file1.txt");
+
+    return 0;
+}
