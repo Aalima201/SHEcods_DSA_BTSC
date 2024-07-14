@@ -41,3 +41,30 @@ Output:
 
 The results are printed, showing the best routes before the traffic updates.
 
+
+
+QUESTION 2 EXPLANATION :
+Friend Class:
+
+Represents a friend with a name and follower count.
+
+
+updateFollowers Function:
+
+Updates the follower count of a given friend.
+
+
+getMostInfluentialFriends Function:
+
+Sorts the friends in descending order based on their follower count.
+Returns the top 4 friends as the most influential.
+
+
+Main Function:
+
+Initializes Rajat's friends with their initial follower counts.
+Updates the follower counts based on the provided changes.
+Adds new friends.
+Determines and prints the most influential friends.
+
+
