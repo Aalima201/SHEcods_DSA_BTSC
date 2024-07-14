@@ -1,0 +1,64 @@
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <algorithm>
+
+// Class to represent a Friend
+class Friend {
+public:
+    std::string name;
+    int followers;
+
+    Friend(std::string name, int followers) : name(name), followers(followers) {}
+};
+
+// Function to update the followers of a friend
+void updateFollowers(Friend& friend_obj, int new_followers) {
+    friend_obj.followers += new_followers;
+}
+
+// Function to get the most influential friends (top 4 by followers)
+std::vector<Friend> getMostInfluentialFriends(std::vector<Friend>& friends) {
+    std::sort(friends.begin(), friends.end(), [](const Friend& a, const Friend& b) {
+        return a.followers > b.followers;
+    });
+    // Return the top 4 friends
+    std::vector<Friend> top_friends(friends.begin(), friends.begin() + 4);
+    return top_friends;
+}
+
+int main() {
+    // Step 1: Create connections between Rajat and his friends
+    std::vector<Friend> friends = {
+        Friend("Rahul", 996),
+        Friend("Seema", 5147),
+        Friend("Shaily", 5601),
+        Friend("Sanjay", 451),
+        Friend("Sameer", 364),
+        Friend("Abhijeet", 996),
+        Friend("Rakesh", 1454),
+        Friend("Aparajita", 2547),
+        Friend("Ganesh", 259),
+        Friend("Fatima", 807)
+    };
+
+    // Update follower counts
+    updateFollowers(friends[1], 258); // Seema
+    updateFollowers(friends[0], 1000); // Rahul
+    updateFollowers(friends[5], 502); // Abhijeet
+
+    // Add new friends
+    friends.push_back(Friend("Abhiraj", 5478));
+    friends.push_back(Friend("Bala", 1574));
+
+    // Get most influential friends
+    std::vector<Friend> influential_friends = getMostInfluentialFriends(friends);
+
+    // Print the most influential friends
+    std::cout << "Most Influential Friends:" << std::endl;
+    for (const Friend& friend_obj : influential_friends) {
+        std::cout << friend_obj.name << " with " << friend_obj.followers << " followers." << std::endl;
+    }
+
+    return 0;
+}
